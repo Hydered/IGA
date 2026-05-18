@@ -1,0 +1,23 @@
+{
+  "name": "iga-access-management",
+  "version": "1.0.0",
+  "description": "Веб-система управления согласованием ИТ-доступов",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/*.test.js",
+    "init-db": "node src/db/init.js"
+  },
+  "keywords": ["access-management", "approval", "it"],
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^11.0.3"
+  }
+}

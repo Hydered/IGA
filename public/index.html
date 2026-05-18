@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IGA — Управление ИТ-доступами</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Экран входа -->
+  <section id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="logo">IGA</div>
+      <h1>Управление ИТ-доступами</h1>
+      <p class="subtitle">Система подачи и согласования заявок на доступ</p>
+      <form id="login-form" action="#" method="post" autocomplete="on">
+        <div class="form-group">
+          <label for="login-input">Логин</label>
+          <input type="text" id="login-input" required autocomplete="username" placeholder="applicant">
+        </div>
+        <div class="form-group">
+          <label for="password-input">Пароль</label>
+          <input type="password" id="password-input" required autocomplete="current-password" placeholder="password123">
+        </div>
+        <p id="login-error" class="error-text"></p>
+        <button type="submit" id="login-submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Войти</button>
+      </form>
+      <p style="margin-top:1rem;font-size:0.75rem;color:var(--muted)">
+        applicant / approver / executor / admin — пароль password123
+      </p>
+    </div>
+  </section>
+
+  <!-- Основное приложение -->
+  <div id="app" class="hidden">
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo" style="width:36px;height:36px;font-size:0.85rem">IGA</div>
+        <span>ИТ-доступы</span>
+      </div>
+      <nav>
+        <button class="nav-btn active" data-view="list">Заявки</button>
+        <button class="nav-btn" data-view="create">Новая заявка</button>
+        <button class="nav-btn hidden" id="nav-reports" data-view="reports">Отчёты</button>
+      </nav>
+      <div class="user-info">
+        <span id="user-name"></span>
+        <span id="user-role" class="role-badge"></span>
+        <button id="logout-btn" class="btn btn-secondary btn-sm">Выход</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <!-- Список заявок -->
+      <section id="view-list" class="view">
+        <div class="panel">
+          <h2>Заявки на доступ</h2>
+          <div class="filters-bar">
+            <div class="form-group">
+              <label>Поиск</label>
+              <input type="text" id="filter-search" placeholder="Номер, ФИО, текст...">
+            </div>
+            <div class="form-group">
+              <label>Статус</label>
+              <select id="filter-status"></select>
+            </div>
+            <div class="form-group">
+              <label>Приоритет</label>
+              <select id="filter-priority"></select>
+            </div>
+            <div class="form-group">
+              <label>Дата с</label>
+              <input type="date" id="filter-date-from">
+            </div>
+            <div class="form-group">
+              <label>Дата по</label>
+              <input type="date" id="filter-date-to">
+            </div>
+            <button id="btn-apply-filters" class="btn btn-primary">Применить</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Номер</th>
+                  <th>Заявитель</th>
+                  <th>Ресурс</th>
+                  <th>Тип доступа</th>
+                  <th>Приоритет</th>
+                  <th>Статус</th>
+                  <th>Дата</th>
+                </tr>
+              </thead>
+              <tbody id="requests-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Создание заявки -->
+      <section id="view-create" class="view hidden">
+        <div class="panel">
+          <h2>Новая заявка на доступ</h2>
+          <form id="create-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Подразделение</label>
+                <select id="create-department" required></select>
+              </div>
+              <div class="form-group">
+                <label>Приоритет</label>
+                <select id="create-priority">
+                  <option value="низкий">низкий</option>
+                  <option value="средний" selected>средний</option>
+                  <option value="высокий">высокий</option>
+                  <option value="критический">критический</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Ресурс</label>
+                <select id="create-resource" required></select>
+              </div>
+              <div class="form-group">
+                <label>Тип доступа</label>
+                <select id="create-access-type" required></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Срок с</label>
+                <input type="date" id="create-valid-from" required>
+              </div>
+              <div class="form-group">
+                <label>Срок по</label>
+                <input type="date" id="create-valid-until" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Обоснование</label>
+              <textarea id="create-justification" required placeholder="Опишите цель доступа..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Создать заявку</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Карточка заявки -->
+      <section id="view-detail" class="view hidden">
+        <button id="btn-back" class="btn btn-secondary btn-sm" style="margin-bottom:1rem">← К списку</button>
+        <input type="hidden" id="detail-id">
+        <div class="panel" style="display:flex;justify-content:space-between;align-items:center">
+          <h2 id="detail-number" style="border:none;margin:0;padding:0"></h2>
+          <span id="detail-status" class="badge"></span>
+        </div>
+        <div id="detail-route-error" class="alert-banner hidden" role="alert"></div>
+        <div id="detail-status-note" class="alert-banner hidden" role="status"></div>
+        <div id="detail-actions" class="btn-group" style="margin-bottom:1rem"></div>
+        <div class="detail-grid">
+          <div>
+            <div class="panel">
+              <h2>Информация</h2>
+              <div id="detail-info"></div>
+              <div id="detail-info-edit" class="hidden"></div>
+            </div>
+            <div class="panel">
+              <h2>Комментарии</h2>
+              <div id="detail-comments"></div>
+              <div style="margin-top:1rem;display:flex;gap:0.5rem">
+                <input type="text" id="comment-input" placeholder="Добавить комментарий..." style="flex:1">
+                <button id="btn-add-comment" class="btn btn-secondary">Отправить</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h2>Вложения</h2>
+              <div id="detail-attachments" class="attachments-list"></div>
+              <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center">
+                <input type="file" id="file-input">
+                <button id="btn-upload-file" class="btn btn-secondary btn-sm">Прикрепить</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="panel">
+              <h2>Маршрут согласования</h2>
+              <div id="detail-approvers"></div>
+              <div id="detail-approvers-edit" class="hidden"></div>
+            </div>
+            <div class="panel">
+              <h2>История изменений</h2>
+              <ul id="detail-history" class="timeline"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Отчёты -->
+      <section id="view-reports" class="view hidden">
+        <div class="panel">
+          <h2>Отчёт по заявкам</h2>
+          <div class="filters-bar">
+            <div class="form-group">
+              <label>Дата с</label>
+              <input type="date" id="report-date-from">
+            </div>
+            <div class="form-group">
+              <label>Дата по</label>
+              <input type="date" id="report-date-to">
+            </div>
+            <button id="btn-generate-report" class="btn btn-primary">Сформировать</button>
+            <button id="btn-export-report" class="btn btn-secondary">Экспорт CSV</button>
+          </div>
+          <div id="report-stats" class="report-stats"></div>
+          <div class="form-row">
+            <div class="panel">
+              <h2>По статусам</h2>
+              <div id="report-by-status"></div>
+            </div>
+            <div class="panel">
+              <h2>По подразделениям</h2>
+              <div id="report-by-dept"></div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="report-table">
+              <thead>
+                <tr>
+                  <th>Номер</th>
+                  <th>Заявитель</th>
+                  <th>Подразделение</th>
+                  <th>Ресурс</th>
+                  <th>Статус</th>
+                  <th>Дата</th>
+                </tr>
+              </thead>
+              <tbody id="report-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="approval-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="approval-modal-title">
+    <div class="modal-panel">
+      <h3 id="approval-modal-title">Комментарий согласующего</h3>
+      <p class="modal-description" id="approval-modal-description">Укажите причину отклонения или запроса уточнения.</p>
+      <textarea id="approval-modal-comment" placeholder="Введите комментарий..." rows="5"></textarea>
+      <p id="approval-modal-error" class="modal-error"></p>
+      <div class="modal-actions">
+        <button type="button" id="approval-modal-cancel" class="btn btn-secondary btn-sm">Отмена</button>
+        <button type="button" id="approval-modal-submit" class="btn btn-primary btn-sm">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Не даём форме перезагрузить страницу, если основной скрипт ещё не подключился
+    document.getElementById('login-form')?.addEventListener('submit', function (e) {
+      e.preventDefault();
+    });
+  </script>
+  <script src="/js/api.js?v=4"></script>
+  <script src="/js/app.js?v=4"></script>
+</body>
+</html>
