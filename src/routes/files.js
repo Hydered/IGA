@@ -17,14 +17,14 @@ router.use(authenticate);
 
 router.post('/:requestId', upload.single('file'), (req, res) => {
   const result = fileService.saveFile(Number(req.params.requestId), req.user, req.file);
-  if (!result.success) return res.status(400).json({ error: result.error });
+  if (!result.success) return res.status(result.httpStatus || 400).json({ error: result.error });
   res.status(201).json(result);
 });
 
 router.get('/:attachmentId/download', (req, res) => {
-  const data = fileService.getFilePath(Number(req.params.attachmentId));
-  if (!data) return res.status(404).json({ error: 'Файл не найден' });
-  res.download(data.path, data.attachment.original_name);
+  const result = fileService.getFilePath(Number(req.params.attachmentId), req.user);
+  if (!result.success) return res.status(result.httpStatus || 404).json({ error: result.error });
+  res.download(result.path, result.downloadName);
 });
 
 module.exports = router;

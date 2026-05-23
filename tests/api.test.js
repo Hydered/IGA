@@ -61,6 +61,7 @@ describe('API и бизнес-логика', () => {
     const created = requestService.createRequest(user, {
       resource_id: resource.id,
       access_type_id: accessType.id,
+      basis: 'HR-2024-001',
       justification: 'Тестовая заявка для unit-теста',
       priority: 'средний',
       approver_ids: [approver1.id, approver2.id],
@@ -113,6 +114,7 @@ describe('API и бизнес-логика', () => {
     const created = requestService.createRequest(user, {
       resource_id: resource.id,
       access_type_id: accessType.id,
+      basis: 'НДА-ИТ-12',
       justification: 'Исходный текст',
       priority: 'низкий',
     });
@@ -122,6 +124,7 @@ describe('API и бизнес-логика', () => {
       {
         resource_id: resource.id,
         access_type_id: accessType.id,
+        basis: 'НДА-ИТ-12',
         justification: 'Обновлённый текст',
         priority: 'высокий',
       },
@@ -141,6 +144,7 @@ describe('API и бизнес-логика', () => {
     const created = requestService.createRequest(user, {
       resource_id: resource.id,
       access_type_id: accessType.id,
+      basis: 'HR-2024-002',
       justification: 'Без согласующих',
       priority: 'средний',
     });
@@ -164,6 +168,7 @@ describe('API и бизнес-логика', () => {
     const created = requestService.createRequest(user, {
       resource_id: resource.id,
       access_type_id: accessType.id,
+      basis: 'НДА-ИТ-15',
       justification: 'Заявка на отклонение',
       priority: 'низкий',
       approver_ids: [approver1.id],

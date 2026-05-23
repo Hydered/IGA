@@ -13,6 +13,7 @@ const PRIORITIES = ['низкий', 'средний', 'высокий', 'кри�
 const ROLES = {
   APPLICANT: 'applicant',
   APPROVER: 'approver',
+  ROUTE_ADMIN: 'route_admin',
   ADMIN: 'admin',
   EXECUTOR: 'executor',
 };

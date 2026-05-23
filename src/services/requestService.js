@@ -1,7 +1,38 @@
 const requestRepository = require('../repositories/requestRepository');
 const userRepository = require('../repositories/userRepository');
+const catalogRepository = require('../repositories/catalogRepository');
 const { STATUSES, PRIORITIES, canTransition } = require('../constants/statuses');
+const { canViewRequest, viewDenied } = require('./accessControl');
+const { validateRequestText, validateCommentText } = require('../utils/validation');
 const logger = require('./loggerService');
+
+function resolveDepartmentId(user, data, fallbackDepartmentId) {
+  if (user.role === 'admin' && data.department_id) {
+    const id = Number(data.department_id);
+    if (!catalogRepository.departmentExists(id)) {
+      return { success: false, error: 'Указано несуществующее подразделение' };
+    }
+    return { success: true, department_id: id };
+  }
+  if (user.role === 'admin' && fallbackDepartmentId) {
+    return { success: true, department_id: fallbackDepartmentId };
+  }
+  if (!user.department_id) {
+    return { success: false, error: 'У пользователя не задано подразделение' };
+  }
+  return { success: true, department_id: user.department_id };
+}
+
+function validateEligibleApprovers(ids) {
+  const unique = [...new Set(ids.map(Number).filter(Boolean))];
+  if (!unique.length) {
+    return { success: false, error: 'Выберите хотя бы одного согласующего' };
+  }
+  if (userRepository.countEligibleApprovers(unique) !== unique.length) {
+    return { success: false, error: 'В маршруте могут быть только пользователи с ролью согласующий' };
+  }
+  return { success: true, ids: unique };
+}
 
 function validateDates(data) {
   if (!data.valid_from || !data.valid_until) {
@@ -35,19 +66,25 @@ function createRequest(user, data) {
   const dateValidation = validateDates(data);
   if (!dateValidation.success) return dateValidation;
 
-  if (!data.resource_id || !data.access_type_id || !data.justification?.trim()) {
-    return { success: false, error: 'Заполните ресурс, тип доступа и обоснование' };
+  if (!data.resource_id || !data.access_type_id) {
+    return { success: false, error: 'Заполните ресурс и тип доступа' };
   }
+  const textFields = validateRequestText(data);
+  if (!textFields.success) return textFields;
   if (!PRIORITIES.includes(data.priority || 'средний')) {
     return { success: false, error: 'Некорректный приоритет' };
   }
 
+  const dept = resolveDepartmentId(user, data);
+  if (!dept.success) return dept;
+
   const request = requestRepository.create({
     applicant_id: user.id,
-    department_id: data.department_id || user.department_id,
+    department_id: dept.department_id,
     resource_id: data.resource_id,
     access_type_id: data.access_type_id,
-    justification: data.justification.trim(),
+    basis: textFields.basis,
+    justification: textFields.justification,
     priority: data.priority || 'средний',
     valid_from: data.valid_from,
     valid_until: data.valid_until,
@@ -55,7 +92,9 @@ function createRequest(user, data) {
   });
 
   if (data.approver_ids?.length) {
-    data.approver_ids.forEach((aid, i) => {
+    const approverCheck = validateEligibleApprovers(data.approver_ids);
+    if (!approverCheck.success) return approverCheck;
+    approverCheck.ids.forEach((aid, i) => {
       requestRepository.addApprover(request.id, aid, i + 1);
     });
   }
@@ -75,7 +114,8 @@ function createRequest(user, data) {
 
 function getRequest(id, user) {
   const request = requestRepository.findById(id);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
   const enriched = enrichRequest(request);
   enriched.can_edit_approvers = canEditApprovers(request, user);
   enriched.can_edit_request = canEditRequest(request, user);
@@ -88,6 +128,8 @@ function listRequests(user, filters) {
     f.applicant_id = user.id;
   } else if (user.role === 'approver') {
     if (!f.all) f.approver_id = user.id;
+  } else if (user.role === 'route_admin') {
+    // видит все заявки для управления маршрутами
   }
   const requests = requestRepository.findAll(f);
   return { success: true, requests: requests.map(enrichRequest) };
@@ -141,7 +183,8 @@ function enrichRequest(request) {
 
 function submitForApproval(requestId, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   // Проверка: только автор заявки (applicant) и администраторы могут отправлять на согласование
   if (request.applicant_id !== user.id && user.role !== 'admin') {
@@ -194,17 +237,21 @@ function changeStatus(request, newStatus, user, details) {
 }
 
 function addComment(requestId, user, text) {
-  if (!text?.trim()) return { success: false, error: 'Комментарий не может быть пустым' };
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
-  const comment = requestRepository.addComment(requestId, user.id, text.trim());
-  requestRepository.addHistory(requestId, user.id, 'комментарий', null, null, text.trim());
+  const commentText = validateCommentText(text);
+  if (!commentText.success) return commentText;
+
+  const comment = requestRepository.addComment(requestId, user.id, commentText.value);
+  requestRepository.addHistory(requestId, user.id, 'комментарий', null, null, commentText.value);
   logger.info('requests', `Комментарий к заявке ${request.number}`, user.id);
   return { success: true, comment };
 }
 
 function canEditRequest(request, user) {
+  if (user.role === 'route_admin') return false;
   if (user.role === 'admin') {
     return [STATUSES.NEW, STATUSES.CLARIFICATION, STATUSES.PENDING].includes(request.status);
   }
@@ -222,7 +269,31 @@ function canEditRequest(request, user) {
   return false;
 }
 
-const canEditApprovers = canEditRequest;
+function canEditApprovers(request, user) {
+  const editableStatuses = [STATUSES.NEW, STATUSES.CLARIFICATION, STATUSES.PENDING];
+  if (!editableStatuses.includes(request.status)) return false;
+
+  if (user.role === 'admin' || user.role === 'route_admin') {
+    if (request.status === STATUSES.PENDING) {
+      const route = requestRepository.getApprovers(request.id);
+      return route.every((a) => !a.decision);
+    }
+    return true;
+  }
+
+  if (request.applicant_id !== user.id) return false;
+
+  if (request.status === STATUSES.NEW || request.status === STATUSES.CLARIFICATION) {
+    return true;
+  }
+
+  if (request.status === STATUSES.PENDING) {
+    const route = requestRepository.getApprovers(request.id);
+    return route.every((a) => !a.decision);
+  }
+
+  return false;
+}
 
 function buildRequestDiff(oldRequest, updated) {
   const changes = [];
@@ -252,6 +323,9 @@ function buildRequestDiff(oldRequest, updated) {
     changes.push(`Срок действия: ${oldValidity} → ${newValidity}`);
   }
 
+  if (oldRequest.basis !== updated.basis) {
+    changes.push(`Основание: ${oldRequest.basis || '—'} → ${updated.basis || '—'}`);
+  }
   if (oldRequest.justification !== updated.justification) {
     changes.push('Обоснование изменено');
   }
@@ -261,7 +335,8 @@ function buildRequestDiff(oldRequest, updated) {
 
 function updateRequest(requestId, data, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   // Approver не может редактировать заявки
   if (user.role === 'approver') {
@@ -286,18 +361,24 @@ function updateRequest(requestId, data, user) {
   const dateValidation = validateDates(data);
   if (!dateValidation.success) return dateValidation;
 
-  if (!data.resource_id || !data.access_type_id || !data.justification?.trim()) {
-    return { success: false, error: 'Заполните ресурс, тип доступа и обоснование' };
+  if (!data.resource_id || !data.access_type_id) {
+    return { success: false, error: 'Заполните ресурс и тип доступа' };
   }
+  const textFields = validateRequestText(data);
+  if (!textFields.success) return textFields;
   if (!PRIORITIES.includes(data.priority || 'средний')) {
     return { success: false, error: 'Некорректный приоритет' };
   }
 
+  const dept = resolveDepartmentId(user, data, request.department_id);
+  if (!dept.success) return dept;
+
   const updated = requestRepository.update(requestId, {
-    department_id: data.department_id || request.department_id,
+    department_id: dept.department_id,
     resource_id: data.resource_id,
     access_type_id: data.access_type_id,
-    justification: data.justification.trim(),
+    basis: textFields.basis,
+    justification: textFields.justification,
     priority: data.priority || 'средний',
     valid_from: data.valid_from,
     valid_until: data.valid_until,
@@ -322,14 +403,20 @@ function updateRequest(requestId, data, user) {
 
 function setApprovers(requestId, approverIds, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
-  // Approver не может изменять маршрут согласования
   if (user.role === 'approver') {
     return {
       success: false,
       error:
-        'Согласующие (approver) не могут изменять маршрут согласования. Это доступно только заявителям (applicant) и администраторам (admin).',
+        'Согласующие не могут изменять маршрут. Это доступно заявителям, администраторам маршрутов и администраторам системы.',
+    };
+  }
+  if (user.role === 'route_admin' && !canEditApprovers(request, user)) {
+    return {
+      success: false,
+      error: 'Маршрут нельзя изменить: заявка уже согласована или есть решения согласующих',
     };
   }
 
@@ -341,10 +428,9 @@ function setApprovers(requestId, approverIds, user) {
     };
   }
 
-  const ids = [...new Set((approverIds || []).map(Number).filter(Boolean))];
-  if (!ids.length) {
-    return { success: false, error: 'Выберите хотя бы одного согласующего' };
-  }
+  const approverCheck = validateEligibleApprovers(approverIds || []);
+  if (!approverCheck.success) return approverCheck;
+  const ids = approverCheck.ids;
 
   const db = require('../db/database').getDb();
   const oldRoute = requestRepository.getApprovers(requestId);
@@ -383,6 +469,7 @@ module.exports = {
   updateRequest,
   canEditApprovers,
   canEditRequest,
+  canViewRequest,
   enrichRequest,
   STATUSES,
 };

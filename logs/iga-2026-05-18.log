@@ -1,5 +1,0 @@
-{"timestamp":"2026-05-18T05:07:07.561Z","level":"info","module":"server","message":"Сервер запущен на http://localhost:3000","userId":null,"meta":null}
-{"timestamp":"2026-05-18T05:07:25.727Z","level":"info","module":"auth","message":"Вход пользователя: applicant","userId":1,"meta":null}
-{"timestamp":"2026-05-18T05:07:43.007Z","level":"info","module":"auth","message":"Вход пользователя: approver","userId":2,"meta":null}
-{"timestamp":"2026-05-18T05:07:51.109Z","level":"info","module":"auth","message":"Вход пользователя: executor","userId":3,"meta":null}
-{"timestamp":"2026-05-18T05:08:01.456Z","level":"info","module":"auth","message":"Вход пользователя: admin","userId":4,"meta":null}

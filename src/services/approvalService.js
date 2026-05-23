@@ -1,11 +1,13 @@
 const requestRepository = require('../repositories/requestRepository');
 const requestService = require('./requestService');
+const { canViewRequest, viewDenied } = require('./accessControl');
 const { STATUSES } = require('../constants/statuses');
 const logger = require('./loggerService');
 
 function processApproval(requestId, user, decision, comment) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   if (user.role !== 'approver' && user.role !== 'admin') {
     return {
@@ -93,7 +95,8 @@ function processApproval(requestId, user, decision, comment) {
 
 function completeRequest(requestId, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   if (user.role !== 'executor' && user.role !== 'admin') {
     return {
@@ -112,7 +115,8 @@ function completeRequest(requestId, user) {
 
 function closeRequest(requestId, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   if (user.role !== 'executor' && user.role !== 'admin') {
     return {
@@ -126,7 +130,8 @@ function closeRequest(requestId, user) {
 
 function resubmitAfterClarification(requestId, user) {
   const request = requestRepository.findById(requestId);
-  if (!request) return { success: false, error: 'Заявка не найдена' };
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
 
   if (request.applicant_id !== user.id && user.role !== 'admin') {
     return {

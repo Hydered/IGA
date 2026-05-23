@@ -27,7 +27,7 @@
         <button type="submit" id="login-submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem">Войти</button>
       </form>
       <p style="margin-top:1rem;font-size:0.75rem;color:var(--muted)">
-        applicant / approver / executor / admin — пароль password123
+        applicant / approver / route_admin / executor / admin — пароль password123
       </p>
     </div>
   </section>
@@ -138,6 +138,11 @@
                 <label>Срок по</label>
                 <input type="date" id="create-valid-until" required>
               </div>
+            </div>
+            <div class="form-group">
+              <label>Основание</label>
+              <input type="text" id="create-basis" required placeholder="Ссылка на НДА или заявку HR (например, HR-2024-001)">
+              <p class="field-hint">Ссылка на внутренний нормативный документ или заявку HR</p>
             </div>
             <div class="form-group">
               <label>Обоснование</label>
@@ -264,7 +269,7 @@
       e.preventDefault();
     });
   </script>
-  <script src="/js/api.js?v=4"></script>
-  <script src="/js/app.js?v=4"></script>
+  <script src="/js/api.js?v=6"></script>
+  <script src="/js/app.js?v=6"></script>
 </body>
 </html>

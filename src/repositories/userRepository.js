@@ -31,4 +31,16 @@ function findApprovers() {
     .all();
 }
 
-module.exports = { findByLogin, findById, findApprovers };
+function countEligibleApprovers(ids) {
+  if (!ids?.length) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) as c FROM users
+       WHERE id IN (${placeholders}) AND role IN ('approver', 'admin')`
+    )
+    .get(...ids);
+  return row.c;
+}
+
+module.exports = { findByLogin, findById, findApprovers, countEligibleApprovers };

@@ -14,4 +14,9 @@ function getAccessTypes() {
   return getDb().prepare('SELECT * FROM access_types ORDER BY name').all();
 }
 
-module.exports = { getDepartments, getResources, getAccessTypes };
+function departmentExists(id) {
+  const row = getDb().prepare('SELECT 1 FROM departments WHERE id = ?').get(id);
+  return !!row;
+}
+
+module.exports = { getDepartments, getResources, getAccessTypes, departmentExists };

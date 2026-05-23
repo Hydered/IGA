@@ -520,6 +520,12 @@ tr.clickable { cursor: pointer; }
   font-size: 0.8rem;
 }
 
+.field-hint {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .decision-согласовано { color: var(--success); }
 .decision-отклонено { color: var(--danger); }
 .decision-уточнение { color: var(--warning); }

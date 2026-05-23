@@ -86,10 +86,7 @@ const files = {
     fd.append('file', file);
     return api(`/files/${requestId}`, { method: 'POST', body: fd });
   },
-  downloadUrl: (attachmentId) => {
-    const token = getToken();
-    return `${API_BASE}/files/${attachmentId}/download?token=${token}`;
-  },
+  downloadUrl: (attachmentId) => `${API_BASE}/files/${attachmentId}/download`,
 };
 
 const reports = {

@@ -157,10 +157,34 @@ function roleLabel(role) {
   const map = {
     applicant: 'Заявитель',
     approver: 'Согласующий',
+    route_admin: 'Администратор маршрутов',
     admin: 'Администратор',
     executor: 'Исполнитель',
   };
   return map[role] || role;
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text || '';
+  return d.innerHTML;
+}
+
+function escapeAttr(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;');
+}
+
+function formatBasis(value) {
+  if (!value) return '—';
+  const text = escapeHtml(value);
+  if (/^https?:\/\//i.test(value)) {
+    return `<a href="${text}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  }
+  return text;
 }
 
 // --- Auth ---
@@ -295,7 +319,7 @@ function showApp() {
     else navReports.classList.add('hidden');
   }
   const filterAll = $('#filter-all-wrap');
-  if (filterAll && (currentUser.role === 'approver' || currentUser.role === 'admin')) {
+  if (filterAll && (currentUser.role === 'approver' || currentUser.role === 'admin' || currentUser.role === 'route_admin')) {
     filterAll.classList.remove('hidden');
   }
 
@@ -368,12 +392,12 @@ function renderRequestsTable(items) {
     .map(
       (r) => `
     <tr class="clickable" data-id="${r.id}">
-      <td><strong>${r.number}</strong></td>
-      <td>${r.applicant_name}</td>
-      <td>${r.resource_name}</td>
-      <td>${r.access_type_name}</td>
-      <td class="priority-${r.priority}">${r.priority}</td>
-      <td><span class="${statusClass(r.status)}">${r.status}</span></td>
+      <td><strong>${escapeHtml(r.number)}</strong></td>
+      <td>${escapeHtml(r.applicant_name)}</td>
+      <td>${escapeHtml(r.resource_name)}</td>
+      <td>${escapeHtml(r.access_type_name)}</td>
+      <td class="priority-${escapeAttr(r.priority)}">${escapeHtml(r.priority)}</td>
+      <td><span class="${statusClass(r.status)}">${escapeHtml(r.status)}</span></td>
       <td>${formatDate(r.created_at)}</td>
     </tr>`
     )
@@ -436,6 +460,7 @@ async function handleCreate(e) {
     department_id: Number($('#create-department').value),
     resource_id: Number($('#create-resource').value),
     access_type_id: Number($('#create-access-type').value),
+    basis: $('#create-basis').value,
     justification: $('#create-justification').value,
     priority: $('#create-priority').value,
     valid_from: validFrom,
@@ -473,13 +498,14 @@ function renderRequestDetail(r) {
   $('#detail-status').textContent = r.status;
 
   $('#detail-info').innerHTML = `
-    <div class="detail-field"><div class="label">Заявитель</div><div class="value">${r.applicant_name}</div></div>
-    <div class="detail-field"><div class="label">Подразделение</div><div class="value">${r.department_name}</div></div>
-    <div class="detail-field"><div class="label">Ресурс</div><div class="value">[${r.resource_type}] ${r.resource_name}</div></div>
-    <div class="detail-field"><div class="label">Тип доступа</div><div class="value">${r.access_type_name}</div></div>
-    <div class="detail-field"><div class="label">Приоритет</div><div class="value priority-${r.priority}">${r.priority}</div></div>
+    <div class="detail-field"><div class="label">Заявитель</div><div class="value">${escapeHtml(r.applicant_name)}</div></div>
+    <div class="detail-field"><div class="label">Подразделение</div><div class="value">${escapeHtml(r.department_name)}</div></div>
+    <div class="detail-field"><div class="label">Ресурс</div><div class="value">[${escapeHtml(r.resource_type)}] ${escapeHtml(r.resource_name)}</div></div>
+    <div class="detail-field"><div class="label">Тип доступа</div><div class="value">${escapeHtml(r.access_type_name)}</div></div>
+    <div class="detail-field"><div class="label">Приоритет</div><div class="value priority-${escapeAttr(r.priority)}">${escapeHtml(r.priority)}</div></div>
     <div class="detail-field"><div class="label">Срок действия</div><div class="value">${r.valid_from || '—'} — ${r.valid_until || '—'}</div></div>
-    <div class="detail-field"><div class="label">Обоснование</div><div class="value">${r.justification}</div></div>
+    <div class="detail-field"><div class="label">Основание</div><div class="value">${formatBasis(r.basis)}</div></div>
+    <div class="detail-field"><div class="label">Обоснование</div><div class="value">${escapeHtml(r.justification)}</div></div>
     ${r.approval_comment ? `<div class="detail-field"><div class="label">Комментарий согласующего</div><div class="value">${escapeHtml(r.approval_comment)}</div></div>` : ''}
     <div class="detail-field"><div class="label">Создана</div><div class="value">${formatDate(r.created_at)}</div></div>
   `;
@@ -495,8 +521,8 @@ function renderRequestDetail(r) {
       const isWaiting = !a.decision;
       return `
     <div class="approver-item ${isWaiting ? 'waiting' : 'decided'}">
-      <span class="approver-name">${a.approver_name}</span>
-      <span class="decision-${a.decision || ''}">${a.decision || 'ожидает'}</span>
+      <span class="approver-name">${escapeHtml(a.approver_name)}</span>
+      <span class="decision-${escapeAttr(a.decision || '')}">${escapeHtml(a.decision || 'ожидает')}</span>
     </div>`;
     })
     .join('') || '<p class="empty-state">Маршрут не задан</p>';
@@ -507,19 +533,26 @@ function renderRequestDetail(r) {
     .map(
       (c) => `
     <div class="comment">
-      <div class="author">${c.user_name}</div>
+      <div class="author">${escapeHtml(c.user_name)}</div>
       <div class="date">${formatDate(c.created_at)}</div>
-      <p>${c.text}</p>
+      <p>${escapeHtml(c.text)}</p>
     </div>`
     )
     .join('') || '<p class="empty-state">Нет комментариев</p>';
 
-  $('#detail-attachments').innerHTML = (r.attachments || [])
+  const attachmentsEl = $('#detail-attachments');
+  attachmentsEl.innerHTML = (r.attachments || [])
     .map(
       (a) =>
-        `<a href="/api/files/${a.id}/download" target="_blank" onclick="event.preventDefault();downloadFile(${a.id},'${a.original_name}')">${a.original_name} (${Math.round(a.size / 1024)} КБ)</a>`
+        `<a href="#" class="attachment-link" data-id="${a.id}" data-name="${escapeAttr(a.original_name)}">${escapeHtml(a.original_name)} (${Math.round(a.size / 1024)} КБ)</a>`
     )
     .join('') || '<p class="empty-state">Нет вложений</p>';
+  attachmentsEl.querySelectorAll('.attachment-link').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      downloadFile(Number(link.dataset.id), link.dataset.name);
+    });
+  });
 
   if (r.status === 'требуется уточнение') {
     const comment = extractApprovalComment(r);
@@ -682,6 +715,11 @@ function renderRequestInfoEdit(r) {
         </div>
       </div>
       <div class="form-group">
+        <label>Основание</label>
+        <input type="text" id="edit-basis" value="${escapeHtml(r.basis || '')}" placeholder="Ссылка на НДА или заявку HR">
+        <p class="field-hint">Ссылка на внутренний нормативный документ или заявку HR</p>
+      </div>
+      <div class="form-group">
         <label>Обоснование</label>
         <textarea id="edit-justification" rows="4">${escapeHtml(r.justification)}</textarea>
       </div>
@@ -696,12 +734,6 @@ function renderRequestInfoEdit(r) {
     editBox.classList.add('hidden');
     infoBox?.classList.remove('hidden');
   });
-}
-
-function escapeHtml(text) {
-  const d = document.createElement('div');
-  d.textContent = text || '';
-  return d.innerHTML;
 }
 
 function extractApprovalComment(r) {
@@ -743,12 +775,17 @@ async function saveRequestInfo() {
     department_id: Number($('#edit-department').value),
     resource_id: Number($('#edit-resource').value),
     access_type_id: Number($('#edit-access-type').value),
+    basis: $('#edit-basis').value,
     justification: $('#edit-justification').value,
     priority: $('#edit-priority').value,
     valid_from: validFrom,
     valid_until: validUntil,
   };
 
+  if (!data.basis?.trim()) {
+    showToast('Заполните основание (ссылка на НДА или заявку HR)', 'error');
+    return;
+  }
   if (!data.justification?.trim()) {
     showToast('Заполните обоснование', 'error');
     return;
@@ -844,7 +881,7 @@ function renderActions(r) {
     addBtn('Редактировать заявку', 'btn btn-secondary btn-sm', () => showRequestInfoEdit());
   }
 
-  if (r.can_edit_approvers && (isOwner || role === 'admin')) {
+  if (r.can_edit_approvers && (isOwner || role === 'admin' || role === 'route_admin')) {
     addBtn('Редактировать маршрут', 'btn btn-secondary btn-sm', () => showApproversEdit());
   }
 
@@ -1109,11 +1146,11 @@ function renderReport(report) {
     .map(
       (r) => `
     <tr>
-      <td>${r.number}</td>
-      <td>${r.applicant}</td>
-      <td>${r.department}</td>
-      <td>${r.resource}</td>
-      <td><span class="${statusClass(r.status)}">${r.status}</span></td>
+      <td>${escapeHtml(r.number)}</td>
+      <td>${escapeHtml(r.applicant)}</td>
+      <td>${escapeHtml(r.department)}</td>
+      <td>${escapeHtml(r.resource)}</td>
+      <td><span class="${statusClass(r.status)}">${escapeHtml(r.status)}</span></td>
       <td>${formatDate(r.created_at)}</td>
     </tr>`
     )

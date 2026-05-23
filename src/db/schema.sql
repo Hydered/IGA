@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS requests (
   department_id INTEGER NOT NULL,
   resource_id INTEGER NOT NULL,
   access_type_id INTEGER NOT NULL,
+  basis TEXT,
   justification TEXT NOT NULL,
   priority TEXT NOT NULL DEFAULT 'средний',
   valid_from TEXT,

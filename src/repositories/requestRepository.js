@@ -27,8 +27,8 @@ function create(data) {
     .prepare(
       `INSERT INTO requests
        (number, applicant_id, department_id, resource_id, access_type_id,
-        justification, priority, valid_from, valid_until, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        basis, justification, priority, valid_from, valid_until, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       number,
@@ -36,6 +36,7 @@ function create(data) {
       data.department_id,
       data.resource_id,
       data.access_type_id,
+      data.basis?.trim() || null,
       data.justification,
       data.priority,
       data.valid_from || null,
@@ -74,9 +75,9 @@ function findAll(filters = {}) {
     params.push(filters.priority);
   }
   if (filters.search) {
-    sql += ' AND (r.number LIKE ? OR r.justification LIKE ? OR u.full_name LIKE ?)';
+    sql += ' AND (r.number LIKE ? OR r.justification LIKE ? OR r.basis LIKE ? OR u.full_name LIKE ?)';
     const term = `%${filters.search}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term);
   }
   if (filters.date_from) {
     sql += ' AND date(r.created_at) >= date(?)';
@@ -119,6 +120,7 @@ function update(id, data) {
          department_id = ?,
          resource_id = ?,
          access_type_id = ?,
+         basis = ?,
          justification = ?,
          priority = ?,
          valid_from = ?,
@@ -130,6 +132,7 @@ function update(id, data) {
       data.department_id,
       data.resource_id,
       data.access_type_id,
+      data.basis?.trim() || null,
       data.justification,
       data.priority,
       data.valid_from || null,

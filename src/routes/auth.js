@@ -1,11 +1,21 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const authService = require('../services/authService');
+const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const userRepository = require('../repositories/userRepository');
 
 const router = express.Router();
 
-router.post('/login', (req, res) => {
+const loginLimiter = rateLimit({
+  windowMs: config.loginRateLimitWindowMs,
+  max: config.loginRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Слишком много попыток входа. Повторите позже.' },
+});
+
+router.post('/login', loginLimiter, (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) {
     return res.status(400).json({ error: 'Укажите логин и пароль' });

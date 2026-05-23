@@ -2,6 +2,7 @@ const express = require('express');
 const requestService = require('../services/requestService');
 const approvalService = require('../services/approvalService');
 const { authenticate } = require('../middleware/auth');
+const { sendServiceResult } = require('../utils/httpResult');
 
 const router = express.Router();
 
@@ -23,72 +24,65 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const result = requestService.createRequest(req.user, req.body);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.status(201).json(result);
+  sendServiceResult(res, requestService.createRequest(req.user, req.body), 201);
 });
 
 router.get('/:id', (req, res) => {
-  const result = requestService.getRequest(Number(req.params.id), req.user);
-  if (!result.success) return res.status(404).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(res, requestService.getRequest(Number(req.params.id), req.user));
 });
 
 router.post('/:id/submit', (req, res) => {
-  const result = requestService.submitForApproval(Number(req.params.id), req.user);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(res, requestService.submitForApproval(Number(req.params.id), req.user));
 });
 
 router.post('/:id/comments', (req, res) => {
-  const result = requestService.addComment(Number(req.params.id), req.user, req.body.text);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.status(201).json(result);
+  sendServiceResult(
+    res,
+    requestService.addComment(Number(req.params.id), req.user, req.body.text),
+    201
+  );
 });
 
 router.put('/:id', (req, res) => {
-  const result = requestService.updateRequest(Number(req.params.id), req.body, req.user);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(res, requestService.updateRequest(Number(req.params.id), req.body, req.user));
 });
 
 router.put('/:id/approvers', (req, res) => {
-  const result = requestService.setApprovers(
-    Number(req.params.id),
-    req.body.approver_ids || [],
-    req.user
+  sendServiceResult(
+    res,
+    requestService.setApprovers(
+      Number(req.params.id),
+      req.body.approver_ids || [],
+      req.user
+    )
   );
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
 });
 
 router.post('/:id/approve', (req, res) => {
-  const result = approvalService.processApproval(
-    Number(req.params.id),
-    req.user,
-    req.body.decision,
-    req.body.comment
+  sendServiceResult(
+    res,
+    approvalService.processApproval(
+      Number(req.params.id),
+      req.user,
+      req.body.decision,
+      req.body.comment
+    )
   );
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
 });
 
 router.post('/:id/resubmit', (req, res) => {
-  const result = approvalService.resubmitAfterClarification(Number(req.params.id), req.user);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(
+    res,
+    approvalService.resubmitAfterClarification(Number(req.params.id), req.user)
+  );
 });
 
 router.post('/:id/complete', (req, res) => {
-  const result = approvalService.completeRequest(Number(req.params.id), req.user);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(res, approvalService.completeRequest(Number(req.params.id), req.user));
 });
 
 router.post('/:id/close', (req, res) => {
-  const result = approvalService.closeRequest(Number(req.params.id), req.user);
-  if (!result.success) return res.status(400).json({ error: result.error });
-  res.json(result);
+  sendServiceResult(res, approvalService.closeRequest(Number(req.params.id), req.user));
 });
 
 module.exports = router;

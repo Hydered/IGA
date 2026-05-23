@@ -25,25 +25,35 @@ function initDatabase() {
       deptCount = 0;
     }
 
+    const resetOnStart =
+      !config.isProduction && process.env.IGA_RESET_DB === 'true';
+
     if (deptCount === 0) {
       db.exec(schema);
       seedData(db);
-    } else {
+      console.log('База данных создана:', config.dbPath);
+    } else if (resetOnStart) {
       resetDatabase(db);
       db.exec(schema);
       seedData(db);
+      console.log('База данных пересоздана (IGA_RESET_DB=true):', config.dbPath);
+    } else {
+      migrateSchema(db);
+      console.log('База данных готова:', config.dbPath);
     }
-
-    console.log(
-      'База данных инициализирована заново:',
-      config.dbPath
-    );
 
     return true;
   } catch (err) {
     console.error('Ошибка initDatabase:', err);
 
     return false;
+  }
+}
+
+function migrateSchema(db) {
+  const cols = db.prepare('PRAGMA table_info(requests)').all().map((c) => c.name);
+  if (!cols.includes('basis')) {
+    db.exec('ALTER TABLE requests ADD COLUMN basis TEXT');
   }
 }
 
@@ -107,8 +117,10 @@ function seedData(db) {
   );
 
   [
-    ['чтение', 'Только просмотр'],
-    ['запись', 'Чтение и создание файлов'],
+    ['чтение', 'Только просмотр данных'],
+    ['запись', 'Чтение и изменение данных'],
+    ['полный доступ', 'Полный доступ к ресурсу без администрирования'],
+    ['администрирование', 'Управление настройками и правами ресурса'],
   ].forEach((a) => insertAccess.run(...a));
 
   // === ПОЛЬЗОВАТЕЛИ ===
@@ -160,6 +172,16 @@ function seedData(db) {
     'executor',
     'executor@company.local',
     1,
+  ],
+
+  [
+    'route_admin',
+    hash,
+    'Администратор маршрутов',
+    1,
+    'route_admin',
+    'route_admin@company.local',
+    0,
   ],
 
   [
