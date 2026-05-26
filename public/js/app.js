@@ -581,8 +581,22 @@ function renderRequestDetail(r) {
     showDetailStatusNote(`Заявка согласована.${approvedComment}`, 'info');
   } else if (r.status === 'выполнена') {
     const completedComment = extractApprovalComment(r) ? ` ${escapeHtml(extractApprovalComment(r))}` : '';
-    showDetailStatusNote(`Заявка выполнена.${completedComment}`, 'info');
+    if (r.needs_acknowledgment && currentUser.id === r.applicant_id) {
+      showDetailStatusNote(
+        `Доступ выдан. Подтвердите ознакомление в блоке ниже — после этого заявку можно закрыть.${completedComment}`,
+        'warn'
+      );
+    } else if (r.needs_acknowledgment) {
+      showDetailStatusNote(
+        `Доступ выдан. Ожидается подпись ознакомления заявителем.${completedComment}`,
+        'warn'
+      );
+    } else {
+      showDetailStatusNote(`Заявка выполнена. Ознакомление подписано.${completedComment}`, 'info');
+    }
   }
+
+  renderAcknowledgment(r);
 
   $('#detail-history').innerHTML = (r.history || [])
     .map((h) => {
@@ -909,7 +923,70 @@ function renderActions(r) {
   }
 
   if (r.status === 'выполнена' && (role === 'executor' || role === 'admin')) {
-    addBtn('Закрыть заявку', 'btn btn-secondary', () => closeRequest());
+    if (r.acknowledged_at) {
+      addBtn('Закрыть заявку', 'btn btn-secondary', () => closeRequest());
+    }
+  }
+}
+
+function renderAcknowledgment(r) {
+  const panel = $('#detail-acknowledgment-panel');
+  const content = $('#detail-acknowledgment-content');
+  if (!panel || !content) return;
+
+  if (r.status !== 'выполнена' && !r.acknowledged_at) {
+    panel.classList.add('hidden');
+    content.innerHTML = '';
+    return;
+  }
+
+  panel.classList.remove('hidden');
+
+  if (r.acknowledged_at) {
+    content.innerHTML = `
+      <p class="ack-signed">
+        <strong>Ознакомлен:</strong> ${escapeHtml(r.acknowledged_by_name || '—')}
+        <span class="ack-date">${formatDate(r.acknowledged_at)}</span>
+      </p>`;
+    return;
+  }
+
+  if (r.can_acknowledge) {
+    content.innerHTML = `
+      <p class="ack-hint">Подтвердите, что вы ознакомлены с фактом и условиями выданного доступа.</p>
+      <label class="ack-label">
+        <input type="checkbox" id="ack-checkbox">
+        <span>Я ознакомлен(а) с выдачей доступа и условиями его использования</span>
+      </label>
+      <button type="button" id="btn-acknowledge" class="btn btn-primary btn-sm" disabled>
+        Подписать ознакомление
+      </button>`;
+    const cb = $('#ack-checkbox');
+    const btn = $('#btn-acknowledge');
+    cb?.addEventListener('change', () => {
+      if (btn) btn.disabled = !cb.checked;
+    });
+    btn?.addEventListener('click', () => acknowledgeAccess());
+    return;
+  }
+
+  content.innerHTML =
+    '<p class="alert-banner warn">Ожидается подпись ознакомления заявителем перед закрытием заявки.</p>';
+}
+
+async function acknowledgeAccess() {
+  const { requests } = getApi();
+  const id = $('#detail-id').value;
+  if (!$('#ack-checkbox')?.checked) {
+    showToast('Отметьте подтверждение ознакомления', 'error');
+    return;
+  }
+  try {
+    await requests.acknowledge(id);
+    showToast('Ознакомление подписано', 'success');
+    await loadRequestDetail(id);
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }
 

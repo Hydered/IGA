@@ -9,7 +9,9 @@ config.assertSecurityConfig();
 const { initDatabase } = require('./db/init');
 const fileService = require('./services/fileService');
 const errorHandler = require('./middleware/errorHandler');
+const requestContextMiddleware = require('./middleware/requestContext');
 const logger = require('./services/loggerService');
+const { startExpiryReminderScheduler } = require('./services/notificationService');
 
 const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
@@ -31,9 +33,11 @@ const corsOptions = config.corsOrigin
       ],
     };
 
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
+app.use(requestContextMiddleware);
 
 app.use(
   express.static(path.join(__dirname, '../public'), {
@@ -73,6 +77,8 @@ async function startServer() {
 
     console.log('Папка uploads проверена');
 
+    const expiryTimer = startExpiryReminderScheduler();
+
     app.listen(config.port, () => {
       console.log(`Сервер запущен: http://localhost:${config.port}`);
 
@@ -81,6 +87,9 @@ async function startServer() {
         `Сервер запущен на http://localhost:${config.port}`
       );
     });
+
+    process.on('SIGTERM', () => clearInterval(expiryTimer));
+    process.on('SIGINT', () => clearInterval(expiryTimer));
   } catch (err) {
     console.error('Ошибка запуска сервера:');
     console.error(err);

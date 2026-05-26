@@ -3,6 +3,7 @@ const path = require('path');
 
 const { getDb } = require('../db/database');
 const config = require('../config');
+const { getRequestContext } = require('../utils/requestContext');
 
 function ensureLogDir() {
   if (!fs.existsSync(config.logDir)) {
@@ -10,8 +11,24 @@ function ensureLogDir() {
   }
 }
 
+function resolveClientMeta(meta) {
+  const ctx = getRequestContext();
+  const ip = meta?.ip || ctx.ip || 'unknown';
+  const userAgent = meta?.userAgent || ctx.userAgent || 'unknown';
+  return {
+    ip: String(ip),
+    userAgent: String(userAgent),
+  };
+}
+
 function log(level, module, message, userId = null, meta = null) {
   ensureLogDir();
+
+  const { ip, userAgent } = resolveClientMeta(meta);
+  const metaPayload =
+    meta && typeof meta === 'object'
+      ? { ...meta, ip, userAgent }
+      : { ip, userAgent, details: meta };
 
   const entry = {
     timestamp: new Date().toISOString(),
@@ -19,22 +36,20 @@ function log(level, module, message, userId = null, meta = null) {
     module,
     message,
     userId,
-    meta,
+    ip,
+    userAgent,
+    meta: metaPayload,
   };
 
-  // Вывод в консоль
-  console.log(
-    `[${level.toUpperCase()}] [${module}] ${message}`
-  );
+  console.log(`[${level.toUpperCase()}] [${module}] ${message} [${ip}]`);
 
-  // Запись в БД
   try {
     getDb()
       .prepare(
         `
         INSERT INTO system_log
-        (level, module, message, user_id, meta)
-        VALUES (?, ?, ?, ?, ?)
+        (level, module, message, user_id, ip_address, user_agent, meta)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `
       )
       .run(
@@ -42,21 +57,20 @@ function log(level, module, message, userId = null, meta = null) {
         module,
         message,
         userId,
-        meta ? JSON.stringify(meta) : null
+        ip,
+        userAgent,
+        JSON.stringify(metaPayload)
       );
   } catch (err) {
     console.error('Ошибка записи лога в БД:', err.message);
   }
 
-  // Запись в файл
   try {
     const line = JSON.stringify(entry) + '\n';
-
     const logFile = path.join(
       config.logDir,
       `iga-${new Date().toISOString().slice(0, 10)}.log`
     );
-
     fs.appendFileSync(logFile, line, 'utf8');
   } catch (err) {
     console.error('Ошибка записи лога в файл:', err.message);

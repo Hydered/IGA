@@ -88,7 +88,10 @@ function processApproval(requestId, user, decision, comment) {
 
   return {
     success: true,
-    request: requestService.enrichRequest(requestRepository.findById(requestId)),
+    request: requestService.enrichRequest(
+      requestRepository.findById(requestId),
+      user
+    ),
     message: 'Решение зафиксировано, ожидаются другие согласующие',
   };
 }
@@ -122,6 +125,14 @@ function closeRequest(requestId, user) {
     return {
       success: false,
       error: 'Только исполнители (executor) и администраторы (admin) могут закрыть заявку',
+    };
+  }
+
+  if (!request.acknowledged_at) {
+    return {
+      success: false,
+      error:
+        'Закрытие возможно после подписи ознакомления заявителем (поле «Ознакомлен»)',
     };
   }
 

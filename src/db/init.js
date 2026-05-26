@@ -55,6 +55,37 @@ function migrateSchema(db) {
   if (!cols.includes('basis')) {
     db.exec('ALTER TABLE requests ADD COLUMN basis TEXT');
   }
+  if (!cols.includes('acknowledged_at')) {
+    db.exec('ALTER TABLE requests ADD COLUMN acknowledged_at TEXT');
+  }
+  if (!cols.includes('acknowledged_by')) {
+    db.exec('ALTER TABLE requests ADD COLUMN acknowledged_by INTEGER');
+  }
+
+  const logCols = db.prepare('PRAGMA table_info(system_log)').all().map((c) => c.name);
+  if (!logCols.includes('ip_address')) {
+    db.exec(
+      "ALTER TABLE system_log ADD COLUMN ip_address TEXT NOT NULL DEFAULT 'legacy'"
+    );
+  }
+  if (!logCols.includes('user_agent')) {
+    db.exec(
+      "ALTER TABLE system_log ADD COLUMN user_agent TEXT NOT NULL DEFAULT 'legacy'"
+    );
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notification_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id INTEGER NOT NULL,
+      notification_type TEXT NOT NULL,
+      recipient TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'email',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE,
+      UNIQUE(request_id, notification_type, recipient)
+    )
+  `);
 }
 
 function resetDatabase(db) {

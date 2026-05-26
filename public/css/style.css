@@ -494,6 +494,32 @@ tr.clickable { cursor: pointer; }
   margin-bottom: 0.75rem;
 }
 
+#detail-acknowledgment-panel .ack-hint {
+  margin-bottom: 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ack-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.ack-label input {
+  margin-top: 0.2rem;
+}
+
+.ack-signed .ack-date {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .approvers-checklist {
   background: var(--bg);
   border: 1px solid var(--border);

@@ -78,6 +78,7 @@ const requests = {
   resubmit: (id) => api(`/requests/${id}/resubmit`, { method: 'POST' }),
   complete: (id) => api(`/requests/${id}/complete`, { method: 'POST' }),
   close: (id) => api(`/requests/${id}/close`, { method: 'POST' }),
+  acknowledge: (id) => api(`/requests/${id}/acknowledge`, { method: 'POST' }),
 };
 
 const files = {

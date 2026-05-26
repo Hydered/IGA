@@ -23,9 +23,9 @@ describe('API и бизнес-логика', () => {
     initDatabase();
     const db = getDb();
 
-    applicant = db.prepare("SELECT * FROM users WHERE login = 'ivanov'").get();
-    approver1 = db.prepare("SELECT * FROM users WHERE login = 'petrov'").get();
-    approver2 = db.prepare("SELECT * FROM users WHERE login = 'sidorov'").get();
+    applicant = db.prepare("SELECT * FROM users WHERE login = 'applicant'").get();
+    approver1 = db.prepare("SELECT * FROM users WHERE login = 'approver'").get();
+    approver2 = db.prepare("SELECT * FROM users WHERE login = 'admin'").get();
     executor = db.prepare("SELECT * FROM users WHERE login = 'executor'").get();
     admin = db.prepare("SELECT * FROM users WHERE login = 'admin'").get();
   });
@@ -36,14 +36,14 @@ describe('API и бизнес-логика', () => {
   });
 
   it('авторизация с корректными данными', () => {
-    const result = authService.login('ivanov', 'password123');
+    const result = authService.login('applicant', 'password123');
     assert.strictEqual(result.success, true);
     assert.ok(result.token);
-    assert.strictEqual(result.user.login, 'ivanov');
+    assert.strictEqual(result.user.login, 'applicant');
   });
 
   it('авторизация с неверным паролем', () => {
-    const result = authService.login('ivanov', 'wrong');
+    const result = authService.login('applicant', 'wrong');
     assert.strictEqual(result.success, false);
   });
 
@@ -96,6 +96,16 @@ describe('API и бизнес-логика', () => {
     });
     assert.strictEqual(completed.success, true);
     assert.strictEqual(completed.request.status, STATUSES.COMPLETED);
+
+    const closedWithoutAck = approvalService.closeRequest(created.request.id, {
+      id: executor.id,
+      role: 'executor',
+    });
+    assert.strictEqual(closedWithoutAck.success, false);
+
+    const ack = requestService.acknowledgeRequest(created.request.id, user);
+    assert.strictEqual(ack.success, true);
+    assert.ok(ack.request.acknowledged_at);
 
     const closed = approvalService.closeRequest(created.request.id, {
       id: executor.id,

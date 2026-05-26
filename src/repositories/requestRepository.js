@@ -5,12 +5,14 @@ const REQUEST_SELECT = `
          u.full_name as applicant_name,
          d.name as department_name,
          res.name as resource_name, res.type as resource_type,
-         at.name as access_type_name
+         at.name as access_type_name,
+         ack.full_name as acknowledged_by_name
   FROM requests r
   JOIN users u ON r.applicant_id = u.id
   JOIN departments d ON r.department_id = d.id
   JOIN resources res ON r.resource_id = res.id
   JOIN access_types at ON r.access_type_id = at.id
+  LEFT JOIN users ack ON r.acknowledged_by = ack.id
 `;
 
 function generateNumber() {
@@ -243,6 +245,54 @@ function findAttachment(id) {
   return getDb().prepare('SELECT * FROM attachments WHERE id = ?').get(id);
 }
 
+function setAcknowledgment(requestId, userId) {
+  getDb()
+    .prepare(
+      `UPDATE requests
+       SET acknowledged_at = datetime('now'),
+           acknowledged_by = ?,
+           updated_at = datetime('now')
+       WHERE id = ?`
+    )
+    .run(userId, requestId);
+  return findById(requestId);
+}
+
+function findExpiringInDays(days) {
+  const target = new Date();
+  target.setDate(target.getDate() + Number(days));
+  const iso = target.toISOString().slice(0, 10);
+
+  return getDb()
+    .prepare(
+      `${REQUEST_SELECT}
+       WHERE r.status IN ('согласована', 'выполнена')
+         AND r.valid_until IS NOT NULL
+         AND date(r.valid_until) = date(?)`
+    )
+    .all(iso);
+}
+
+function wasNotificationSent(requestId, notificationType, recipient) {
+  const row = getDb()
+    .prepare(
+      `SELECT 1 FROM notification_log
+       WHERE request_id = ? AND notification_type = ? AND recipient = ?`
+    )
+    .get(requestId, notificationType, recipient);
+  return !!row;
+}
+
+function logNotification(requestId, notificationType, recipient, channel = 'email') {
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO notification_log
+       (request_id, notification_type, recipient, channel)
+       VALUES (?, ?, ?, ?)`
+    )
+    .run(requestId, notificationType, recipient, channel);
+}
+
 function getReportStats(filters = {}) {
   const db = getDb();
   let where = 'WHERE 1=1';
@@ -304,4 +354,8 @@ module.exports = {
   findAttachment,
   getReportStats,
   generateNumber,
+  setAcknowledgment,
+  findExpiringInDays,
+  wasNotificationSent,
+  logNotification,
 };

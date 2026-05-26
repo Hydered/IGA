@@ -85,4 +85,11 @@ router.post('/:id/close', (req, res) => {
   sendServiceResult(res, approvalService.closeRequest(Number(req.params.id), req.user));
 });
 
+router.post('/:id/acknowledge', (req, res) => {
+  sendServiceResult(
+    res,
+    requestService.acknowledgeRequest(Number(req.params.id), req.user)
+  );
+});
+
 module.exports = router;

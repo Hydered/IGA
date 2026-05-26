@@ -31,6 +31,15 @@ function findApprovers() {
     .all();
 }
 
+function findByRole(role) {
+  return getDb()
+    .prepare(
+      `SELECT u.id, u.login, u.full_name, u.email, u.role
+       FROM users u WHERE u.role = ?`
+    )
+    .all(role);
+}
+
 function countEligibleApprovers(ids) {
   if (!ids?.length) return 0;
   const placeholders = ids.map(() => '?').join(',');
@@ -43,4 +52,10 @@ function countEligibleApprovers(ids) {
   return row.c;
 }
 
-module.exports = { findByLogin, findById, findApprovers, countEligibleApprovers };
+module.exports = {
+  findByLogin,
+  findById,
+  findApprovers,
+  findByRole,
+  countEligibleApprovers,
+};

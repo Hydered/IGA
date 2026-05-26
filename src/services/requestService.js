@@ -5,6 +5,7 @@ const { STATUSES, PRIORITIES, canTransition } = require('../constants/statuses')
 const { canViewRequest, viewDenied } = require('./accessControl');
 const { validateRequestText, validateCommentText } = require('../utils/validation');
 const logger = require('./loggerService');
+const notificationService = require('./notificationService');
 
 function resolveDepartmentId(user, data, fallbackDepartmentId) {
   if (user.role === 'admin' && data.department_id) {
@@ -109,14 +110,14 @@ function createRequest(user, data) {
   );
 
   logger.info('requests', `Создана заявка ${request.number}`, user.id);
-  return { success: true, request: enrichRequest(request) };
+  return { success: true, request: enrichRequest(request, user) };
 }
 
 function getRequest(id, user) {
   const request = requestRepository.findById(id);
   if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
   if (!canViewRequest(request, user)) return viewDenied();
-  const enriched = enrichRequest(request);
+  const enriched = enrichRequest(request, user);
   enriched.can_edit_approvers = canEditApprovers(request, user);
   enriched.can_edit_request = canEditRequest(request, user);
   return { success: true, request: enriched };
@@ -132,7 +133,7 @@ function listRequests(user, filters) {
     // видит все заявки для управления маршрутами
   }
   const requests = requestRepository.findAll(f);
-  return { success: true, requests: requests.map(enrichRequest) };
+  return { success: true, requests: requests.map((r) => enrichRequest(r, user)) };
 }
 
 function getApprovalComment(history, request) {
@@ -168,9 +169,16 @@ function getApprovalComment(history, request) {
   return approvalComment ? approvalComment.details : null;
 }
 
-function enrichRequest(request) {
+function enrichRequest(request, viewer = null) {
   if (!request) return null;
   const history = requestRepository.getHistory(request.id);
+  const needsAcknowledgment =
+    request.status === STATUSES.COMPLETED && !request.acknowledged_at;
+  const canAcknowledge =
+    needsAcknowledgment &&
+    viewer &&
+    (viewer.id === request.applicant_id || viewer.role === 'admin');
+
   return {
     ...request,
     approvers: requestRepository.getApprovers(request.id),
@@ -178,6 +186,8 @@ function enrichRequest(request) {
     attachments: requestRepository.getAttachments(request.id),
     history,
     approval_comment: getApprovalComment(history, request),
+    needs_acknowledgment: needsAcknowledgment,
+    can_acknowledge: !!canAcknowledge,
   };
 }
 
@@ -233,7 +243,48 @@ function changeStatus(request, newStatus, user, details) {
     details
   );
   logger.info('requests', `Заявка ${request.number}: ${oldStatus} → ${newStatus}`, user.id);
-  return { success: true, request: enrichRequest(updated) };
+  const enriched = enrichRequest(updated, user);
+  notificationService.notifyStatusChange(updated, oldStatus, newStatus).catch((err) => {
+    logger.error('notifications', `Email не отправлен: ${err.message}`, user.id);
+  });
+  return { success: true, request: enriched };
+}
+
+function acknowledgeRequest(requestId, user) {
+  const request = requestRepository.findById(requestId);
+  if (!request) return { success: false, error: 'Заявка не найдена', httpStatus: 404 };
+  if (!canViewRequest(request, user)) return viewDenied();
+
+  if (request.status !== STATUSES.COMPLETED) {
+    return {
+      success: false,
+      error: 'Ознакомление доступно только после выдачи доступа (статус «выполнена»)',
+    };
+  }
+
+  if (request.acknowledged_at) {
+    return { success: false, error: 'Ознакомление уже подтверждено' };
+  }
+
+  if (request.applicant_id !== user.id && user.role !== 'admin') {
+    return {
+      success: false,
+      error: 'Подтвердить ознакомление может только заявитель или администратор',
+    };
+  }
+
+  const updated = requestRepository.setAcknowledgment(requestId, user.id);
+  requestRepository.addHistory(
+    requestId,
+    user.id,
+    'ознакомление',
+    null,
+    'ознакомлен',
+    'Заявитель подтвердил ознакомление с выдачей доступа'
+  );
+
+  logger.info('requests', `Ознакомление по заявке ${request.number}`, user.id);
+  return { success: true, request: enrichRequest(updated, user) };
 }
 
 function addComment(requestId, user, text) {
@@ -395,7 +446,7 @@ function updateRequest(requestId, data, user) {
   );
 
   logger.info('requests', `Заявка ${request.number} отредактирована`, user.id);
-  const enriched = enrichRequest(updated);
+  const enriched = enrichRequest(updated, user);
   enriched.can_edit_approvers = canEditApprovers(updated, user);
   enriched.can_edit_request = canEditRequest(updated, user);
   return { success: true, request: enriched };
@@ -464,6 +515,7 @@ module.exports = {
   listRequests,
   submitForApproval,
   changeStatus,
+  acknowledgeRequest,
   addComment,
   setApprovers,
   updateRequest,

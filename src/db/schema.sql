@@ -50,12 +50,15 @@ CREATE TABLE IF NOT EXISTS requests (
   valid_from TEXT,
   valid_until TEXT,
   status TEXT NOT NULL DEFAULT 'новая',
+  acknowledged_at TEXT,
+  acknowledged_by INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (applicant_id) REFERENCES users(id),
   FOREIGN KEY (department_id) REFERENCES departments(id),
   FOREIGN KEY (resource_id) REFERENCES resources(id),
-  FOREIGN KEY (access_type_id) REFERENCES access_types(id)
+  FOREIGN KEY (access_type_id) REFERENCES access_types(id),
+  FOREIGN KEY (acknowledged_by) REFERENCES users(id)
 );
 
 -- Маршрут согласования
@@ -118,8 +121,22 @@ CREATE TABLE IF NOT EXISTS system_log (
   module TEXT NOT NULL,
   message TEXT NOT NULL,
   user_id INTEGER,
+  ip_address TEXT NOT NULL DEFAULT 'unknown',
+  user_agent TEXT NOT NULL DEFAULT 'unknown',
   meta TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Журнал отправленных email-уведомлений (защита от дублей)
+CREATE TABLE IF NOT EXISTS notification_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL,
+  notification_type TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'email',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE,
+  UNIQUE(request_id, notification_type, recipient)
 );
 
 CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);

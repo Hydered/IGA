@@ -24,6 +24,21 @@ module.exports = {
   corsOrigin: process.env.CORS_ORIGIN || false,
   loginRateLimitWindowMs: 15 * 60 * 1000,
   loginRateLimitMax: Number(process.env.LOGIN_RATE_LIMIT_MAX) || 20,
+  appPublicUrl: process.env.APP_PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`,
+  expiryReminderDays: (process.env.IGA_EXPIRY_REMINDER_DAYS || '7,3,1')
+    .split(',')
+    .map((d) => Number(d.trim()))
+    .filter((d) => d > 0),
+  expiryCheckIntervalMs: Number(process.env.IGA_EXPIRY_CHECK_MS) || 6 * 60 * 60 * 1000,
+  smtp: {
+    enabled: process.env.SMTP_ENABLED === 'true',
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'iga-noreply@company.local',
+  },
   allowedMimeTypes: [
     'application/pdf',
     'image/png',
